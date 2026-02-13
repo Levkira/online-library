@@ -1,0 +1,44 @@
+import { Link } from "react-router-dom";
+import { useFavorites } from "../context/FavoritesContext";
+
+function BookCard({ book }) {
+  const { toggleFavorite, isFavorite } = useFavorites();
+  const workId = book.key.replace("/works/", "");
+
+  return (
+    <div className="book-card flex flex-col h-full overflow-hidden">
+      <Link to={`/works/${workId}`}>
+        {book.cover_id ? (
+          <img
+            src={`https://covers.openlibrary.org/b/id/${book.cover_id}-M.jpg`}
+            alt={book.title}
+            className="h-64 w-full object-cover"
+          />
+        ) : (
+          <div className="h-64 bg-gray-200 flex items-center justify-center text-sm">
+            No Cover
+          </div>
+        )}
+      </Link>
+
+      <div className="p-2 flex flex-col flex-1">
+        <h3 className="text-white font-bold text-base mt-4 line-clamp-2">
+          {book.title}
+        </h3>
+
+        <p className="text-xs text-gray-500 mt-1 mb-3 line-clamp-1">
+          {book.authors?.map((a) => a.name).join(", ")}
+        </p>
+
+        <button
+          onClick={() => toggleFavorite(book)}
+          className="mt-auto text-sm  text-amber-400"
+        >
+          {isFavorite(book.key) ? "Favorite ★" : "Save in ☆"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default BookCard;
