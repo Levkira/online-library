@@ -4,7 +4,7 @@ import { useFavorites } from "../context/FavoritesContext";
 function BookCard({ book }) {
   const { toggleFavorite, isFavorite } = useFavorites();
   const workId = book.key.replace("/works/", "");
-
+  console.log(book);
   return (
     <div className="book-card flex flex-col h-full overflow-hidden">
       <Link to={`/works/${workId}`}>
@@ -26,9 +26,15 @@ function BookCard({ book }) {
           {book.title}
         </h3>
 
-        <p className="text-xs text-gray-500 mt-1 mb-3 line-clamp-1">
-          {book.authors?.map((a) => a.name).join(", ")}
-        </p>
+        {book.author_name ? (
+          <p className="text-xs text-gray-500 mt-1 mb-3 line-clamp-1">
+            {book.author_name}
+          </p>
+        ) : (
+          <p className="text-xs text-gray-500 mt-1 mb-3 line-clamp-1">
+            {book.authors?.map((a) => a.name).join(", ")}
+          </p>
+        )}
 
         <button
           onClick={() => toggleFavorite(book)}
