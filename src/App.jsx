@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
-import BookSearch from "./components/BookSearch";
-import BooksCategory from "./components/BooksCategory";
-import Favorites from "./components/Favorites";
-import BookDetails from "./components/BookDetails";
+import BookSearch from "./pages/BookSearch";
+import BooksCategory from "./pages/BooksCategory";
+import Favorites from "./pages/Favorites";
+import BookDetails from "./pages/BookDetails";
 
 function App() {
   return (

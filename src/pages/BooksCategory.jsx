@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useIntersection } from "react-use";
 import BookCard from "../components/BookCard";
-import Loading from "./Loading";
+import Loading from "../components/Loading";
 
 const LIMIT = 20;
 

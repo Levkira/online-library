@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDebounce, useIntersection } from "react-use";
 import BookCard from "../components/BookCard";
-import Loading from "./Loading";
+import Loading from "../components/Loading";
 
 const LIMIT = 12;
 const MIN_QUERY_LENGTH = 3;

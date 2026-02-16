@@ -1,5 +1,5 @@
 import { useFavorites } from "../context/FavoritesContext";
-import BookCard from "./BookCard";
+import BookCard from "../components/BookCard";
 
 function Favorites() {
   const { favorites } = useFavorites();

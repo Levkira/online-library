@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import Loading from "./Loading";
+import Loading from "../components/Loading";
 
 function BookDetails() {
   const { workId } = useParams();
