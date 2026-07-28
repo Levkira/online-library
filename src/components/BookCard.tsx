@@ -1,16 +1,22 @@
 import { Link } from "react-router-dom";
 import { useFavorites } from "../context/FavoritesContext";
+import type { Book } from "../lib/openLibrary";
 
-function BookCard({ book }) {
+interface BookCardProps {
+  book: Book;
+}
+
+function BookCard({ book }: BookCardProps) {
   const { toggleFavorite, isFavorite } = useFavorites();
   const workId = book.key.replace("/works/", "");
-  
+  const favorite = isFavorite(book.key);
+
   return (
     <div className="book-card flex flex-col h-full overflow-hidden">
       <Link to={`/works/${workId}`}>
-        {book.cover_id ? (
+        {book.coverId ? (
           <img
-            src={`https://covers.openlibrary.org/b/id/${book.cover_id}-M.jpg`}
+            src={`https://covers.openlibrary.org/b/id/${book.coverId}-M.jpg`}
             alt={book.title}
             className="h-64 w-full object-cover"
           />
@@ -26,21 +32,19 @@ function BookCard({ book }) {
           {book.title}
         </h3>
 
-        {book.author_name ? (
+        {book.authorNames.length > 0 && (
           <p className="text-xs text-gray-500 mt-1 mb-3 line-clamp-1">
-            {book.author_name}
-          </p>
-        ) : (
-          <p className="text-xs text-gray-500 mt-1 mb-3 line-clamp-1">
-            {book.authors?.map((a) => a.name).join(", ")}
+            {book.authorNames.join(", ")}
           </p>
         )}
 
         <button
+          type="button"
           onClick={() => toggleFavorite(book)}
-          className="mt-auto text-sm  text-amber-400"
+          aria-pressed={favorite}
+          className="mt-auto text-sm text-amber-400"
         >
-          {isFavorite(book.key) ? "Favorite ★" : "Save in ☆"}
+          {favorite ? "Favorite ★" : "Save in ☆"}
         </button>
       </div>
     </div>

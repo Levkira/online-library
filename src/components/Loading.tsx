@@ -1,6 +1,14 @@
-const Loading = () => {
+interface LoadingProps {
+  className?: string;
+}
+
+const Loading = ({ className = "" }: LoadingProps) => {
   return (
-    <div className="relative flex justify-center mt-5" role="status">
+    <div
+      className={`relative flex justify-center mt-5 ${className}`.trim()}
+      role="status"
+    >
+      <span className="sr-only">Loading…</span>
       <svg
         aria-hidden="true"
         className="h-10 text-gray-200 animate-spin dark:text-gray-600 fill-amber-400"
@@ -20,4 +28,5 @@ const Loading = () => {
     </div>
   );
 };
+
 export default Loading;

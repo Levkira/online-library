@@ -1,10 +1,16 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+// @ts-ignore: CSS side-effect import handled by bundler
 import "./index.css";
-import App from "./App.jsx";
+import App from "./App.tsx";
 import { FavoritesProvider } from "./context/FavoritesContext";
 
-createRoot(document.getElementById("root")).render(
+const rootElement = document.getElementById("root");
+if (!rootElement) {
+  throw new Error("Root element with id 'root' not found in index.html");
+}
+
+createRoot(rootElement).render(
   <StrictMode>
     <FavoritesProvider>
       <App />
