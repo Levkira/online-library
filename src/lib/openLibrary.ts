@@ -1,4 +1,3 @@
-
 export interface Book {
   key: string;
   title: string;
@@ -52,12 +51,86 @@ function normalizeSubjectWork(work: SubjectWork): Book {
   };
 }
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+export function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
+}
+
+export function getErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 429) {
+      return "Open Library is rate-limiting requests right now — please wait a moment and try again.";
+    }
+    if (err.status === 404) {
+      return "Nothing found.";
+    }
+    if (err.status >= 500) {
+      return "Open Library is having trouble right now. Please try again shortly.";
+    }
+  }
+  if (err instanceof TypeError) {
+    return "Network error — check your connection and try again.";
+  }
+  return "Something went wrong. Please try again.";
+}
+
+const MAX_CACHE_ENTRIES = 200;
+const responseCache = new Map<string, unknown>();
+
+function cacheGet<T>(url: string): T | undefined {
+  return responseCache.get(url) as T | undefined;
+}
+
+function cacheSet(url: string, data: unknown): void {
+  if (!responseCache.has(url) && responseCache.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey = responseCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      responseCache.delete(oldestKey);
+    }
+  }
+  responseCache.set(url, data);
+}
+
+export function clearResponseCache(): void {
+  responseCache.clear();
+}
+
 async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const cached = cacheGet<T>(url);
+  if (cached !== undefined) {
+    return cached;
+  }
+
   const res = await fetch(url, { signal });
   if (!res.ok) {
-    throw new Error(`Request to ${url} failed with status ${res.status}`);
+    throw new ApiError(
+      `Request to ${url} failed with status ${res.status}`,
+      res.status,
+    );
   }
-  return res.json() as Promise<T>;
+  const data = (await res.json()) as T;
+  cacheSet(url, data);
+  return data;
+}
+
+export function appendUniqueBooks(existing: Book[], incoming: Book[]): Book[] {
+  const seen = new Set(existing.map((b) => b.key));
+  const deduped: Book[] = [];
+  for (const book of incoming) {
+    if (seen.has(book.key)) continue;
+    seen.add(book.key);
+    deduped.push(book);
+  }
+  return [...existing, ...deduped];
 }
 
 export async function searchBooks(

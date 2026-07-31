@@ -2,78 +2,87 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useDebounce, useIntersection } from "react-use";
 import BookGrid from "../components/BookGrid";
 import Loading from "../components/Loading";
-import { searchBooks, type Book } from "../lib/openLibrary";
+import {
+  appendUniqueBooks,
+  getErrorMessage,
+  isAbortError,
+  searchBooks,
+  type Book,
+} from "../lib/openLibrary";
 
 const LIMIT = 12;
 const MIN_QUERY_LENGTH = 3;
 
 function BookSearch() {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [books, setBooks] = useState<Book[]>([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loaderRef = useRef<HTMLDivElement | null>(null);
+  const loaderRef = useRef<HTMLDivElement>(null);
 
-  const abortRef = useRef<AbortController | null>(null);
-
-  const intersection = useIntersection(loaderRef, {
-    root: null,
-    threshold: 1,
-  });
+  const intersection = useIntersection(
+    loaderRef as React.RefObject<HTMLElement>,
+    { root: null, threshold: 1 },
+  );
 
   useDebounce(
     () => {
-      const normalizedQuery = query.trim();
-      if (normalizedQuery.length < MIN_QUERY_LENGTH || !hasMore) return;
-
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      setLoading(true);
-      setError(null);
-
-      searchBooks(normalizedQuery, page, LIMIT, controller.signal)
-        .then(({ books: newBooks, hasMore: more }) => {
-          setBooks((prev) => (page === 1 ? newBooks : [...prev, ...newBooks]));
-          setHasMore(more);
-        })
-        .catch((err: unknown) => {
-          if (err instanceof DOMException && err.name === "AbortError") return;
-          setHasMore(false);
-          setError("Couldn't search right now. Please try again.");
-        })
-        .finally(() => setLoading(false));
+      setDebouncedQuery(query.trim());
     },
     600,
-    [query, page],
+    [query],
   );
 
   useEffect(() => {
-    return () => abortRef.current?.abort();
-  }, []);
+    if (debouncedQuery.length < MIN_QUERY_LENGTH) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets
+      setBooks([]);
+      setHasMore(true);
+      setError(null);
+      return;
+    }
+
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+
+    searchBooks(debouncedQuery, page, LIMIT, controller.signal)
+      .then(({ books: newBooks, hasMore: more }) => {
+        setBooks((prev) =>
+          page === 1 ? newBooks : appendUniqueBooks(prev, newBooks),
+        );
+        setHasMore(more);
+      })
+      .catch((err: unknown) => {
+        if (isAbortError(err)) return;
+        setHasMore(false);
+        setError(getErrorMessage(err));
+      })
+      .finally(() => setLoading(false));
+
+    return () => controller.abort();
+  }, [debouncedQuery, page]);
 
   useEffect(() => {
     if (
       intersection?.isIntersecting &&
       !loading &&
       hasMore &&
-      query.length >= MIN_QUERY_LENGTH
+      debouncedQuery.length >= MIN_QUERY_LENGTH
     ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reacts
       setPage((p) => p + 1);
     }
-  }, [intersection, loading, hasMore, query]);
+  }, [intersection, loading, hasMore, debouncedQuery]);
 
   const onChange = (e: ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setQuery(value);
     setPage(1);
-    setBooks([]);
-    setHasMore(true);
-    setError(null);
   };
 
   return (

@@ -3,10 +3,28 @@ import type { Book } from "../lib/openLibrary";
 
 const STORAGE_KEY = "favorites";
 
+function isBook(value: unknown): value is Book {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.key === "string" &&
+    typeof candidate.title === "string" &&
+    (candidate.coverId === undefined ||
+      typeof candidate.coverId === "number") &&
+    Array.isArray(candidate.authorNames) &&
+    candidate.authorNames.every((name) => typeof name === "string")
+  );
+}
+
 function loadFavorites(): Book[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? (JSON.parse(saved) as Book[]) : [];
+    if (!saved) return [];
+
+    const parsed: unknown = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter(isBook);
   } catch {
     return [];
   }
@@ -19,7 +37,8 @@ export function useFavorites() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(favorites));
     } catch {
-      
+      // Storage may be unavailable (quota exceeded, private browsing, etc.);
+      // favorites still work for the current session via React state.
     }
   }, [favorites]);
 

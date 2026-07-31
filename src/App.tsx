@@ -1,23 +1,26 @@
-import { HashRouter, Routes, Route } from "react-router-dom";
+import { createHashRouter, RouterProvider } from "react-router-dom";
 import Layout from "./components/Layout";
+import RouteError from "./components/RouteError";
 import Home from "./pages/Home";
 import Favorites from "./pages/Favorites";
 import BookDetails from "./pages/BookDetails";
 import NotFound from "./pages/NotFound";
 
+const router = createHashRouter([
+  {
+    element: <Layout />,
+    errorElement: <RouteError />,
+    children: [
+      { path: "/", element: <Home /> },
+      { path: "/favorites", element: <Favorites /> },
+      { path: "/works/:workId", element: <BookDetails /> },
+      { path: "*", element: <NotFound /> },
+    ],
+  },
+]);
+
 function App() {
-  return (
-    <HashRouter>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/favorites" element={<Favorites />} />
-          <Route path="/works/:workId" element={<BookDetails />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
-      </Routes>
-    </HashRouter>
-  );
+  return <RouterProvider router={router} />;
 }
 
 export default App;

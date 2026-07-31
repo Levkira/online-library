@@ -2,7 +2,13 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useIntersection } from "react-use";
 import BookGrid from "../components/BookGrid";
 import Loading from "../components/Loading";
-import { fetchSubjectBooks, type Book } from "../lib/openLibrary";
+import {
+  appendUniqueBooks,
+  fetchSubjectBooks,
+  getErrorMessage,
+  isAbortError,
+  type Book,
+} from "../lib/openLibrary";
 
 const LIMIT = 20;
 
@@ -22,25 +28,29 @@ function BooksCategory() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loaderRef = useRef<HTMLDivElement | null>(null);
+  const loaderRef = useRef<HTMLDivElement>(null);
   const hasTriggeredRef = useRef(false);
-  const intersection = useIntersection(loaderRef, {
-    root: null,
-    threshold: 1,
-  });
+
+  const intersection = useIntersection(
+    loaderRef as React.RefObject<HTMLElement>,
+    { root: null, threshold: 1 },
+  );
 
   useEffect(() => {
     const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- standard
     setLoading(true);
     setError(null);
 
     fetchSubjectBooks(subject, page, LIMIT, controller.signal)
       .then(({ books: newBooks }) => {
-        setBooks((prev) => (page === 0 ? newBooks : [...prev, ...newBooks]));
+        setBooks((prev) =>
+          page === 0 ? newBooks : appendUniqueBooks(prev, newBooks),
+        );
       })
       .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        setError("Couldn't load books right now. Please try again.");
+        if (isAbortError(err)) return;
+        setError(getErrorMessage(err));
       })
       .finally(() => setLoading(false));
 
@@ -50,6 +60,7 @@ function BooksCategory() {
   useEffect(() => {
     if (intersection?.isIntersecting && !loading && !hasTriggeredRef.current) {
       hasTriggeredRef.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- this
       setPage((p) => p + 1);
     } else if (!intersection?.isIntersecting) {
       hasTriggeredRef.current = false;
