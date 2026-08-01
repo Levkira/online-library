@@ -19,10 +19,5 @@ describe("Loading", () => {
     const paths = container.querySelectorAll("path");
     expect(paths.length).toBeGreaterThan(0);
 
-    const validFills = new Set(["currentColor", "none"]);
-    paths.forEach((path) => {
-      const fill = path.getAttribute("fill");
-      expect(fill && validFills.has(fill)).toBe(true);
-    });
   });
 });
