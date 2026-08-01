@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import BookSearch from "../src/pages/BookSearch";
@@ -28,31 +28,34 @@ function renderBookSearch() {
   );
 }
 
+function setupUser() {
+  return userEvent.setup();
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 describe("BookSearch", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     searchBooksMock.mockReset();
     searchBooksMock.mockResolvedValue({ books: [], hasMore: false });
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it("does not search below the minimum query length", async () => {
-    const user = userEvent.setup({ delay: null });
+    const user = setupUser();
     renderBookSearch();
 
     await user.type(screen.getByLabelText(/search by title/i), "du");
     await act(async () => {
-      vi.advanceTimersByTime(600);
+      await sleep(700);
     });
 
     expect(searchBooksMock).not.toHaveBeenCalled();
   });
 
   it("waits for the debounce before searching after typing", async () => {
-    const user = userEvent.setup({ delay: null });
+    const user = setupUser();
     renderBookSearch();
 
     await user.type(screen.getByLabelText(/search by title/i), "dune");
@@ -61,7 +64,7 @@ describe("BookSearch", () => {
     expect(searchBooksMock).not.toHaveBeenCalled();
 
     await act(async () => {
-      vi.advanceTimersByTime(600);
+      await sleep(700);
     });
 
     expect(searchBooksMock).toHaveBeenCalledWith(
@@ -74,12 +77,12 @@ describe("BookSearch", () => {
 
   it("shows an error message returned by getErrorMessage on failure", async () => {
     searchBooksMock.mockRejectedValue(new openLibrary.ApiError("nope", 429));
-    const user = userEvent.setup({ delay: null });
+    const user = setupUser();
     renderBookSearch();
 
     await user.type(screen.getByLabelText(/search by title/i), "dune");
     await act(async () => {
-      vi.advanceTimersByTime(600);
+      await sleep(700);
     });
 
     expect(await screen.findByText(/rate-limiting/i)).toBeInTheDocument();

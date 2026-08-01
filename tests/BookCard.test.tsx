@@ -49,13 +49,14 @@ describe("BookCard", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
-  it("shows author names when present, and omits the line when empty", () => {
+  it("shows the author line when authors are present", () => {
     renderBookCard(bookWithCover);
     expect(screen.getByText("Frank Herbert")).toBeInTheDocument();
+  });
 
-    const { unmount } = renderBookCard(bookWithoutCover);
+  it("omits the author line when there are no authors", () => {
+    renderBookCard(bookWithoutCover);
     expect(screen.queryByText(/./, { selector: "p.text-xs" })).not.toBeInTheDocument();
-    unmount();
   });
 
   it("links to the work's detail page with the /works/ prefix stripped", () => {

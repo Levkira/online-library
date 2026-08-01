@@ -1,42 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
+  ApiError,
+  appendUniqueBooks,
+  clearResponseCache,
   fetchSubjectBooks,
   fetchWorkDetails,
+  getErrorMessage,
   searchBooks,
   type Book,
 } from "../src/lib/openLibrary";
-
-
-class ApiError extends Error {
-  status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.status = status;
-  }
-}
-
-function appendUniqueBooks(existing: Book[], incoming: Book[]) {
-  const seen = new Set(existing.map((b) => b.key));
-  const result = [...existing];
-  for (const b of incoming) {
-    if (!seen.has(b.key)) {
-      seen.add(b.key);
-      result.push(b);
-    }
-  }
-  return result;
-}
-
-
-function getErrorMessage(err: unknown) {
-  if (err instanceof ApiError) {
-    if (err.status === 429) return "We're being rate-limited";
-    if (err.status === 404) return "Nothing found";
-    if (err.status >= 500) return "The server is having trouble";
-  }
-  if (err instanceof TypeError) return 'A network error occurred';
-  return 'Something went wrong';
-}
 
 function mockFetchOnce(body: unknown, ok = true, status = 200) {
   return vi.fn().mockResolvedValue({
@@ -49,6 +21,10 @@ function mockFetchOnce(body: unknown, ok = true, status = 200) {
 describe("openLibrary", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
+    // Belt-and-braces: every test below also uses a unique query/ID so it
+    // can't collide with another test's cached response even if this ever
+    // stops running for some reason (e.g. during a refactor).
+    clearResponseCache();
   });
 
   afterEach(() => {
@@ -83,7 +59,7 @@ describe("openLibrary", () => {
         }),
       );
 
-      const result = await searchBooks("dune", 1, 12);
+      const result = await searchBooks("search-normalize-docs", 1, 12);
 
       expect(result.books).toEqual([
         {
@@ -103,7 +79,7 @@ describe("openLibrary", () => {
         }),
       );
 
-      const result = await searchBooks("x", 1, 12);
+      const result = await searchBooks("search-defaults-authors", 1, 12);
       expect(result.books[0].authorNames).toEqual([]);
       expect(result.books[0].coverId).toBeUndefined();
     });
@@ -115,7 +91,7 @@ describe("openLibrary", () => {
       }));
       vi.stubGlobal("fetch", mockFetchOnce({ docs }));
 
-      const result = await searchBooks("x", 1, 12);
+      const result = await searchBooks("search-hasmore-true", 1, 12);
       expect(result.hasMore).toBe(true);
     });
 
@@ -125,19 +101,21 @@ describe("openLibrary", () => {
         mockFetchOnce({ docs: [{ key: "/works/OL1W", title: "Only One" }] }),
       );
 
-      const result = await searchBooks("x", 1, 12);
+      const result = await searchBooks("search-hasmore-false", 1, 12);
       expect(result.hasMore).toBe(false);
     });
 
     it("returns an empty, non-more result when docs is missing or malformed", async () => {
       vi.stubGlobal("fetch", mockFetchOnce({}));
-      const result = await searchBooks("x", 1, 12);
+      const result = await searchBooks("search-malformed-response", 1, 12);
       expect(result).toEqual({ books: [], hasMore: false });
     });
 
     it("throws a descriptive error on a non-ok response", async () => {
       vi.stubGlobal("fetch", mockFetchOnce({}, false, 429));
-      await expect(searchBooks("x", 1, 12)).rejects.toThrow("failed with status 429");
+      await expect(searchBooks("search-429-error", 1, 12)).rejects.toThrow(
+        "failed with status 429",
+      );
     });
   });
 
@@ -146,10 +124,10 @@ describe("openLibrary", () => {
       const fetchMock = mockFetchOnce({ works: [] });
       vi.stubGlobal("fetch", fetchMock);
 
-      await fetchSubjectBooks("fantasy", 3, 20);
+      await fetchSubjectBooks("subject-url-test", 3, 20);
 
       const calledUrl = fetchMock.mock.calls[0][0] as string;
-      expect(calledUrl).toContain("/subjects/fantasy.json?limit=20&offset=60");
+      expect(calledUrl).toContain("/subjects/subject-url-test.json?limit=20&offset=60");
     });
 
     it("normalizes subject works, including nested author names", async () => {
@@ -167,7 +145,7 @@ describe("openLibrary", () => {
         }),
       );
 
-      const result = await fetchSubjectBooks("fantasy", 0, 20);
+      const result = await fetchSubjectBooks("subject-normalize", 0, 20);
       expect(result.books).toEqual([
         {
           key: "/works/OL5W",
@@ -183,7 +161,7 @@ describe("openLibrary", () => {
         "fetch",
         mockFetchOnce({ works: [{ key: "/works/OL6W", title: "No Authors" }] }),
       );
-      const result = await fetchSubjectBooks("fantasy", 0, 20);
+      const result = await fetchSubjectBooks("subject-defaults-authors", 0, 20);
       expect(result.books[0].authorNames).toEqual([]);
     });
   });
@@ -200,7 +178,7 @@ describe("openLibrary", () => {
         }),
       );
 
-      const result = await fetchWorkDetails("OL1W");
+      const result = await fetchWorkDetails("OL-DESC-STRING");
       expect(result.description).toBe("A story about spice.");
       expect(result.covers).toEqual([1, -1, 2]);
     });
@@ -214,24 +192,21 @@ describe("openLibrary", () => {
         }),
       );
 
-      const result = await fetchWorkDetails("OL1W");
+      const result = await fetchWorkDetails("OL-DESC-WRAPPED");
       expect(result.description).toBe("A story about spice, wrapped.");
     });
 
     it("leaves description undefined when absent", async () => {
       vi.stubGlobal("fetch", mockFetchOnce({ title: "No Description" }));
-      const result = await fetchWorkDetails("OL9W");
+      const result = await fetchWorkDetails("OL-DESC-ABSENT");
       expect(result.description).toBeUndefined();
     });
 
     it("propagates abort errors so callers can distinguish them", async () => {
       const abortError = new DOMException("Aborted", "AbortError");
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockRejectedValue(abortError),
-      );
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(abortError));
 
-      await expect(fetchWorkDetails("OL1W")).rejects.toThrow("Aborted");
+      await expect(fetchWorkDetails("OL-ABORT-TEST")).rejects.toThrow("Aborted");
     });
   });
 
@@ -240,8 +215,8 @@ describe("openLibrary", () => {
       const fetchMock = mockFetchOnce({ title: "Dune" });
       vi.stubGlobal("fetch", fetchMock);
 
-      await fetchWorkDetails("OL1W");
-      await fetchWorkDetails("OL1W");
+      await fetchWorkDetails("OL-CACHE-HIT");
+      await fetchWorkDetails("OL-CACHE-HIT");
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
@@ -250,8 +225,8 @@ describe("openLibrary", () => {
       const fetchMock = mockFetchOnce({ title: "Dune" });
       vi.stubGlobal("fetch", fetchMock);
 
-      await fetchWorkDetails("OL1W");
-      await fetchWorkDetails("OL2W");
+      await fetchWorkDetails("OL-CACHE-DIFFERENT-A");
+      await fetchWorkDetails("OL-CACHE-DIFFERENT-B");
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
     });
@@ -263,8 +238,8 @@ describe("openLibrary", () => {
         .mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ title: "Dune" }) });
       vi.stubGlobal("fetch", fetchMock);
 
-      await expect(fetchWorkDetails("OL1W")).rejects.toThrow();
-      const result = await fetchWorkDetails("OL1W");
+      await expect(fetchWorkDetails("OL-CACHE-FAIL-THEN-SUCCEED")).rejects.toThrow();
+      const result = await fetchWorkDetails("OL-CACHE-FAIL-THEN-SUCCEED");
 
       expect(result.title).toBe("Dune");
       expect(fetchMock).toHaveBeenCalledTimes(2);
