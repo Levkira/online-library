@@ -1,4 +1,4 @@
-# FindBooks
+# FindBooks - https://levkira.github.io/online-library/
 
 A fast, minimal book discovery app built on the [Open Library](https://openlibrary.org/developers/api) API. Search by title, author, or keyword, browse curated subject categories, and save favorites — all without a backend of your own.
 
